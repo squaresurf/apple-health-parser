@@ -16,17 +16,32 @@ healthXmlToCsv :: String -> IO ()
 healthXmlToCsv file = do
     doc <- readFile def file
     let cursor = fromDocument doc
-        weight = cursor $// element "Record"
-                     >=> attributeIs "type" "HKQuantityTypeIdentifierBodyMass"
-                     &| parserDateAndValue
-        fatPercent = cursor $// element "Record"
-                     >=> attributeIs "type" "HKQuantityTypeIdentifierBodyFatPercentage"
-                     &| parserDateAndValue
+        weight = parseRecords cursor "HKQuantityTypeIdentifierBodyMass"
+        fatPercent = parseRecords cursor "HKQuantityTypeIdentifierBodyFatPercentage"
+
     ByteString.writeFile "weight.csv" $ encode $ ("Date", "Weight (LBS)") : weight
     ByteString.writeFile "fat_percent.csv" $ encode $ ("Date", "Fat Percentage") : fatPercent
 
+parseRecords :: Cursor -> T.Text -> [(T.Text, T.Text)]
+parseRecords c attr =
+  L.sortOn fst
+    $ unique
+    $ c
+    $// element "Record"
+    >=> attributeIs "type" attr
+    &| parserDateAndValue
+
+
 parserDateAndValue :: Cursor -> (T.Text, T.Text)
-parserDateAndValue n = do
-  let v = attribute "value" n
-      d = attribute "startDate" n
-  (head d, head v)
+parserDateAndValue c = do
+  let v = attribute "value" c
+      d = attribute "startDate" c
+  (parseDate $ head d, head v)
+
+parseDate :: T.Text -> T.Text
+parseDate =
+  T.takeWhile (/= ' ')
+
+unique :: Eq a => [(a, b)] -> [(a, b)]
+unique [] = []
+unique (x : xs) = x : unique (L.filter (\x2 -> fst x /= fst x2) xs)
