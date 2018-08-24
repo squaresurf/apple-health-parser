@@ -1,0 +1,5 @@
+.stack-work/
+apple-health-parser.cabal
+*~
+*.xml
+*.csv
